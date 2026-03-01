@@ -190,18 +190,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveToSupabase(todo) {
         showSync()
         const { data: { user } } = await db.auth.getUser()
-        const { error } = await db.from('todos').insert({
-            id: todo.id,
+        const { data, error } = await db.from('todos').insert({
             user_id: user.id,
             text: todo.text,
             description: todo.description,
             due_date: todo.dueDate,
             reminder_mins: todo.reminderMins,
             notified: todo.notified,
-            is_complete: todo.completed,
-            created_at: todo.createdAt
-        })
-        if (error) console.error('Error saving todo:', error)
+            is_complete: todo.completed
+        }).select().single()
+
+        if (error) {
+            console.error('Error saving todo:', error)
+            return null
+        }
+        return data
     }
 
     async function updateInSupabase(id, changes) {
@@ -370,9 +373,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (needsRender) saveAndRender();
     }
 
-    function addTodo(text, description, dueDate, reminderMins) {
+    async function addTodo(text, description, dueDate, reminderMins) {
+        const tempId = 'temp-' + Date.now().toString();
         const newTodo = {
-            id: crypto.randomUUID(),
+            id: tempId,
             text,
             description: description || '',
             dueDate: dueDate || null,
@@ -383,7 +387,21 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         todos.unshift(newTodo);
         saveAndRender();
-        saveToSupabase(newTodo)
+
+        const savedData = await saveToSupabase(newTodo);
+        if (savedData) {
+            const index = todos.findIndex(t => t.id === tempId);
+            if (index !== -1) {
+                todos[index].id = savedData.id;
+                todos[index].createdAt = savedData.created_at;
+                saveAndRender();
+            }
+        } else {
+            // Revert on error
+            todos = todos.filter(t => t.id !== tempId);
+            saveAndRender();
+            alert("Hubo un error al guardar la tarea en la nube.");
+        }
     }
 
     function toggleTodo(id, forcedState = null) {
