@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Task Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- ✅ Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        /* ===== AUTH OVERLAY ===== */
+        #auth-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(10, 10, 20, 0.85);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        #auth-overlay.hidden {
+            display: none;
+        }
+
+        .auth-card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 20px;
+            padding: 40px 36px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+            animation: authFadeIn 0.4s ease;
+        }
+
+        @keyframes authFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.97);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .auth-logo h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 26px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .auth-logo p {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.45);
+            margin-top: 4px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 24px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: rgba(255, 255, 255, 0.5);
+            background: transparent;
+        }
+
+        .auth-tab.active {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #fff;
+            outline: none;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .auth-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .auth-input:focus {
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+
+        .auth-btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: #fff;
+            color: #111;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            margin-top: 4px;
+        }
+
+        .auth-btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .auth-btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+            color: rgba(255, 255, 255, 0.25);
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .auth-oauth-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .auth-btn-oauth {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        .auth-btn-oauth:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .auth-btn-oauth img {
+            width: 16px;
+            height: 16px;
+        }
+
+        .auth-message {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            min-height: 18px;
+            margin-top: 12px;
+            text-align: center;
+            border-radius: 8px;
+            padding: 0;
+            transition: all 0.2s;
+        }
+
+        .auth-message.error {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            padding: 10px;
+        }
+
+        .auth-message.success {
+            color: #51cf66;
+            background: rgba(81, 207, 102, 0.1);
+            padding: 10px;
+        }
+
+        /* ===== USER BAR ===== */
+        .user-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .user-bar span {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-bar i {
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: rgba(255, 80, 80, 0.15);
+            border: 1px solid rgba(255, 80, 80, 0.25);
+            color: #ff6b6b;
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 80, 80, 0.25);
+        }
+
+        #sync-indicator {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #sync-indicator.visible {
+            opacity: 1;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spin-icon {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ✅ AUTH OVERLAY -->
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <h2>JECR Task Manager</h2>
+                <p>Sign in to sync your tasks to the cloud</p>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Sign In</button>
+                <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Register</button>
+            </div>
+            <div id="form-login">
+                <input type="email" id="login-email" class="auth-input" placeholder="Email address" />
+                <input type="password" id="login-password" class="auth-input" placeholder="Password" />
+                <button class="auth-btn-primary" onclick="login()">Sign In</button>
+            </div>
+            <div id="form-register" style="display:none;">
+                <input type="email" id="reg-email" class="auth-input" placeholder="Email address" />
+                <input type="password" id="reg-password" class="auth-input"
+                    placeholder="Password (min. 6 characters)" />
+                <button class="auth-btn-primary" onclick="register()">Create Account</button>
+            </div>
+            <div class="auth-divider">or continue with</div>
+            <div class="auth-oauth-btns">
+                <button class="auth-btn-oauth" onclick="loginWithGoogle()">
+                    <img src="https://www.google.com/favicon.ico" alt="Google"> Google
+                </button>
+                <button class="auth-btn-oauth" onclick="loginWithGitHub()">
+                    <img src="https://github.com/favicon.ico" alt="GitHub"> GitHub
+                </button>
+            </div>
+            <p class="auth-message" id="auth-msg"></p>
+        </div>
+    </div>
+
+    <!-- Tu app original -->
+    <div class="background-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="app-container">
+        <div class="theme-switcher">
+            <label for="theme-select" class="theme-label" aria-label="Select Theme">
+                <i class="fa-solid fa-palette"></i>
+            </label>
+            <select id="theme-select" class="theme-select">
+                <option value="default">Default</option>
+                <option value="light">Claro</option>
+                <option value="dark">Oscuro</option>
+            </select>
+        </div>
+
+        <!-- ✅ Barra de usuario -->
+        <div class="user-bar" id="user-bar" style="display:none;">
+            <span><i class="fa-solid fa-circle-user"></i> <span id="user-email-label">...</span></span>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+            </button>
+        </div>
+
+        <header class="app-header">
+            <h1>JECR Task Manager</h1>
+            <p class="subtitle" id="task-stats">You have 0 tasks today</p>
+        </header>
+
+        <form id="todo-form" class="todo-form">
+            <div class="input-container">
+                <div class="input-group">
+                    <input type="text" id="todo-input" placeholder="What needs to be done?" autocomplete="off"
+                        aria-label="Add a new task title">
+                    <button type="submit" class="add-btn" aria-label="Submit task">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+                <div class="input-group description-group">
+                    <textarea id="todo-desc" placeholder="Add a brief description (optional)..."
+                        aria-label="Add a new task description" rows="2"></textarea>
+                </div>
+                <div class="input-group datetime-group">
+                    <label for="todo-datetime" class="datetime-label">
+                        <i class="fa-regular fa-calendar-plus"></i> Schedule (Optional):
+                    </label>
+                    <input type="datetime-local" id="todo-datetime">
+                    <select id="todo-reminder" class="reminder-select" aria-label="Reminder Time">
+                        <option value="0">At time of event</option>
+                        <option value="5" selected>5 mins before</option>
+                        <option value="10">10 mins before</option>
+                        <option value="15">15 mins before</option>
+                        <option value="30">30 mins before</option>
+                        <option value="60">1 hour before</option>
+                        <option value="1440">1 day before</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+
+        <div class="filters">
+            <button class="filter-btn active" data-filter="all">All <span id="count-all"></span></button>
+            <button class="filter-btn" data-filter="active">Active <span id="count-active"></span></button>
+            <button class="filter-btn" data-filter="completed">Completed <span id="count-completed"></span></button>
+            <button class="filter-btn" data-filter="expired">Caducadas <span id="count-expired"></span></button>
+        </div>
+
+        <div class="todo-container">
+            <ul id="todo-list" class="todo-list"></ul>
+            <div id="empty-state" class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fa-regular fa-calendar-check"></i>
+                </div>
+                <h3>All caught up!</h3>
+                <p>Add a task above to get started.</p>
+            </div>
+        </div>
+
+        <footer class="app-footer">
+            <button id="clear-completed" class="clear-btn">Clear completed</button>
+        </footer>
+    </main>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Edit Task</h3>
+            <form id="edit-form">
+                <div class="input-group">
+                    <input type="text" id="edit-title" required placeholder="Task Title">
+                </div>
+                <div class="input-group description-group mt-3">
+                    <textarea id="edit-desc" rows="3" placeholder="Task Description..."></textarea>
+                </div>
+                <div class="input-group datetime-group mt-3">
+                    <label for="edit-datetime" class="datetime-label">
+                        <i class="fa-regular fa-calendar-plus"></i> Schedule:
+                    </label>
+                    <input type="datetime-local" id="edit-datetime">
+                    <select id="edit-reminder" class="reminder-select">
+                        <option value="0">At time of event</option>
+                        <option value="5">5 mins before</option>
+                        <option value="10">10 mins before</option>
+                        <option value="15">15 mins before</option>
+                        <option value="30">30 mins before</option>
+                        <option value="60">1 hour before</option>
+                        <option value="1440">1 day before</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-edit" class="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn-save">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sync indicator -->
+    <div id="sync-indicator">
+        <i class="fa-solid fa-rotate spin-icon"></i> Syncing...
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
