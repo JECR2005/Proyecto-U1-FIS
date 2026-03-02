@@ -9,9 +9,13 @@ const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
 // ============================================================
-// ✅ FIX ZONA HORARIA: Convierte fecha UTC de Supabase a hora local
-//    Sin esto, una tarea a las 9am se mostraba como 3am al recargar
+// ✅ HELPERS DE ZONA HORARIA
+//    El input datetime-local devuelve "2026-03-02T09:00" (sin zona)
+//    Supabase lo interpreta como UTC, causando +6/-6 horas de diferencia
+//    Solución: convertir a UTC al GUARDAR, y a local al LEER
 // ============================================================
+
+// Al LEER de Supabase: UTC → hora local para mostrar en el input
 function toLocalInputFormat(utcString) {
     const date = new Date(utcString)
     const year = date.getFullYear()
@@ -20,6 +24,12 @@ function toLocalInputFormat(utcString) {
     const hours = String(date.getHours()).padStart(2, '0')
     const minutes = String(date.getMinutes()).padStart(2, '0')
     return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+// Al GUARDAR en Supabase: hora local → UTC ISO string
+function toUTC(localDateString) {
+    if (!localDateString) return null
+    return new Date(localDateString).toISOString()
 }
 
 // ============================================================
@@ -190,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: row.id,
             text: row.text,
             description: row.description || '',
-            // ✅ FIX: Convertir UTC → hora local para mostrar correctamente
+            // ✅ Al LEER: convertir UTC → hora local
             dueDate: row.due_date ? toLocalInputFormat(row.due_date) : null,
             reminderMins: row.reminder_mins ?? 5,
             notified: row.notified ?? false,
@@ -209,7 +219,8 @@ document.addEventListener('DOMContentLoaded', () => {
             user_id: user.id,
             text: todo.text,
             description: todo.description,
-            due_date: todo.dueDate,
+            // ✅ Al GUARDAR: convertir hora local → UTC
+            due_date: toUTC(todo.dueDate),
             reminder_mins: todo.reminderMins,
             notified: todo.notified,
             is_complete: todo.completed
@@ -229,7 +240,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if ('notified' in changes) dbChanges.notified = changes.notified
         if ('text' in changes) dbChanges.text = changes.text
         if ('description' in changes) dbChanges.description = changes.description
-        if ('dueDate' in changes) dbChanges.due_date = changes.dueDate
+        // ✅ Al ACTUALIZAR: también convertir hora local → UTC
+        if ('dueDate' in changes) dbChanges.due_date = toUTC(changes.dueDate)
         if ('reminderMins' in changes) dbChanges.reminder_mins = changes.reminderMins
         const { error } = await db.from('todos').update(dbChanges).eq('id', id)
         if (error) console.error('Error updating todo:', error)
