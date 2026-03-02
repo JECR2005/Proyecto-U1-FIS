@@ -351,17 +351,6 @@
     </div>
 
     <main class="app-container">
-        <div class="theme-switcher">
-            <label for="theme-select" class="theme-label" aria-label="Select Theme">
-                <i class="fa-solid fa-palette"></i>
-            </label>
-            <select id="theme-select" class="theme-select">
-                <option value="default">Default</option>
-                <option value="light">Claro</option>
-                <option value="dark">Oscuro</option>
-            </select>
-        </div>
-
         <!-- ✅ Barra de usuario -->
         <div class="user-bar" id="user-bar" style="display:none;">
             <span><i class="fa-solid fa-circle-user"></i> <span id="user-email-label">...</span></span>
@@ -425,6 +414,16 @@
         </div>
 
         <footer class="app-footer">
+            <div class="theme-switcher">
+                <label for="theme-select" class="theme-label" aria-label="Select Theme">
+                    <i class="fa-solid fa-palette"></i>
+                </label>
+                <select id="theme-select" class="theme-select">
+                    <option value="default">Default</option>
+                    <option value="light">Claro</option>
+                    <option value="dark">Oscuro</option>
+                </select>
+            </div>
             <button id="clear-completed" class="clear-btn">Clear completed</button>
         </footer>
     </main>
