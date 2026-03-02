@@ -10,12 +10,8 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
 // ============================================================
 // ✅ HELPERS DE ZONA HORARIA
-//    El input datetime-local devuelve "2026-03-02T09:00" (sin zona)
-//    Supabase lo interpreta como UTC, causando +6/-6 horas de diferencia
-//    Solución: convertir a UTC al GUARDAR, y a local al LEER
 // ============================================================
 
-// Al LEER de Supabase: UTC → hora local para mostrar en el input
 function toLocalInputFormat(utcString) {
     const date = new Date(utcString)
     const year = date.getFullYear()
@@ -26,14 +22,13 @@ function toLocalInputFormat(utcString) {
     return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
-// Al GUARDAR en Supabase: hora local → UTC ISO string
 function toUTC(localDateString) {
     if (!localDateString) return null
     return new Date(localDateString).toISOString()
 }
 
 // ============================================================
-// ✅ FUNCIONES DE AUTH (llamadas desde el HTML)
+// ✅ FUNCIONES DE AUTH
 // ============================================================
 
 function setAuthMessage(text, type = 'error') {
@@ -172,6 +167,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setMinDateForInputs();
 
+    // ✅ Registrar Service Worker para notificaciones en Brave/Chrome
+    let swRegistration = null
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => {
+                swRegistration = reg
+                console.log('✅ Service Worker registrado')
+            })
+            .catch(err => console.error('❌ Error registrando SW:', err))
+    }
+
     if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission();
     }
@@ -200,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
             id: row.id,
             text: row.text,
             description: row.description || '',
-            // ✅ Al LEER: convertir UTC → hora local
             dueDate: row.due_date ? toLocalInputFormat(row.due_date) : null,
             reminderMins: row.reminder_mins ?? 5,
             notified: row.notified ?? false,
@@ -219,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
             user_id: user.id,
             text: todo.text,
             description: todo.description,
-            // ✅ Al GUARDAR: convertir hora local → UTC
             due_date: toUTC(todo.dueDate),
             reminder_mins: todo.reminderMins,
             notified: todo.notified,
@@ -240,7 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if ('notified' in changes) dbChanges.notified = changes.notified
         if ('text' in changes) dbChanges.text = changes.text
         if ('description' in changes) dbChanges.description = changes.description
-        // ✅ Al ACTUALIZAR: también convertir hora local → UTC
         if ('dueDate' in changes) dbChanges.due_date = toUTC(changes.dueDate)
         if ('reminderMins' in changes) dbChanges.reminder_mins = changes.reminderMins
         const { error } = await db.from('todos').update(dbChanges).eq('id', id)
@@ -370,6 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Date(todo.dueDate).getTime() <= new Date().getTime();
     }
 
+    // ✅ checkAlerts: usa Service Worker para Brave/Chrome
     function checkAlerts() {
         if (!todos.length) return;
         const now = new Date();
@@ -383,11 +387,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!todo.notified) {
                 const notifyTime = dueTime - (todo.reminderMins * 60000);
                 if (currentTime >= notifyTime && currentTime < dueTime) {
-                    if ("Notification" in window && Notification.permission === "granted") {
+                    if (swRegistration && swRegistration.active) {
+                        swRegistration.active.postMessage({
+                            type: 'SHOW_NOTIFICATION',
+                            title: 'JECR Task Reminder 🔔',
+                            body: `Tu tarea "${todo.text}" vence pronto!`
+                        })
+                    } else if ("Notification" in window && Notification.permission === "granted") {
                         new Notification("JECR Task Reminder", {
-                            body: `Your task "${todo.text}" is due soon!`,
+                            body: `Tu tarea "${todo.text}" vence pronto!`,
                             icon: "/favicon.ico"
-                        });
+                        })
                     }
                     todo.notified = true;
                     updateInSupabase(todo.id, { notified: true })
