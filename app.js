@@ -1,12 +1,26 @@
 // ============================================================
 // ✅ CONFIGURA AQUÍ TUS CREDENCIALES DE SUPABASE
 // ============================================================
-const SUPABASE_URL = 'https://crvkwzuekncypkrocgik.supabase.co'   // ← Reemplaza
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydmt3enVla25jeXBrcm9jZ2lrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNzg1MzksImV4cCI6MjA4Nzk1NDUzOX0.0WQLYqGGuaYiqfkVYxKkFFqtvpw58Sqa8BtDhmpIg0Y'                  // ← Reemplaza
+const SUPABASE_URL = 'https://crvkwzuekncypkrocgik.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydmt3enVla25jeXBrcm9jZ2lrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNzg1MzksImV4cCI6MjA4Nzk1NDUzOX0.0WQLYqGGuaYiqfkVYxKkFFqtvpw58Sqa8BtDhmpIg0Y'
 // ============================================================
 
 const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+// ============================================================
+// ✅ FIX ZONA HORARIA: Convierte fecha UTC de Supabase a hora local
+//    Sin esto, una tarea a las 9am se mostraba como 3am al recargar
+// ============================================================
+function toLocalInputFormat(utcString) {
+    const date = new Date(utcString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+}
 
 // ============================================================
 // ✅ FUNCIONES DE AUTH (llamadas desde el HTML)
@@ -176,7 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
             id: row.id,
             text: row.text,
             description: row.description || '',
-            dueDate: row.due_date || null,
+            // ✅ FIX: Convertir UTC → hora local para mostrar correctamente
+            dueDate: row.due_date ? toLocalInputFormat(row.due_date) : null,
             reminderMins: row.reminder_mins ?? 5,
             notified: row.notified ?? false,
             completed: row.is_complete ?? false,
@@ -397,7 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveAndRender();
             }
         } else {
-            // Revert on error
             todos = todos.filter(t => t.id !== tempId);
             saveAndRender();
             alert("Hubo un error al guardar la tarea en la nube.");
