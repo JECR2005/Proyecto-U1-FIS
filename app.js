@@ -28,19 +28,6 @@ function toUTC(localDateString) {
 }
 
 // ============================================================
-// ✅ SERVICE WORKER — Global para que checkAlerts pueda usarlo
-// ============================================================
-let swRegistration = null
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-        .then(reg => {
-            swRegistration = reg
-            console.log('✅ Service Worker registrado')
-        })
-        .catch(err => console.error('❌ Error registrando SW:', err))
-}
-
-// ============================================================
 // ✅ FUNCIONES DE AUTH
 // ============================================================
 
@@ -375,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Date(todo.dueDate).getTime() <= new Date().getTime();
     }
 
+    // ✅ checkAlerts: usa new Notification() directamente (funciona en Brave)
     function checkAlerts() {
         if (!todos.length) return;
         const now = new Date();
@@ -388,16 +376,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!todo.notified) {
                 const notifyTime = dueTime - (todo.reminderMins * 60000);
                 if (currentTime >= notifyTime && currentTime < dueTime) {
-                    if (swRegistration && swRegistration.active) {
-                        swRegistration.active.postMessage({
-                            type: 'SHOW_NOTIFICATION',
-                            title: 'JECR Task Reminder 🔔',
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification('JECR Task Reminder 🔔', {
                             body: `Tu tarea "${todo.text}" vence pronto!`
-                        })
-                    } else if ("Notification" in window && Notification.permission === "granted") {
-                        new Notification("JECR Task Reminder", {
-                            body: `Tu tarea "${todo.text}" vence pronto!`,
-                            icon: "/favicon.ico"
                         })
                     }
                     todo.notified = true;
