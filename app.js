@@ -28,6 +28,19 @@ function toUTC(localDateString) {
 }
 
 // ============================================================
+// ✅ SERVICE WORKER — Global para que checkAlerts pueda usarlo
+// ============================================================
+let swRegistration = null
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+            swRegistration = reg
+            console.log('✅ Service Worker registrado')
+        })
+        .catch(err => console.error('❌ Error registrando SW:', err))
+}
+
+// ============================================================
 // ✅ FUNCIONES DE AUTH
 // ============================================================
 
@@ -166,17 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(savedTheme);
 
     setMinDateForInputs();
-
-    // ✅ Registrar Service Worker para notificaciones en Brave/Chrome
-    let swRegistration = null
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
-            .then(reg => {
-                swRegistration = reg
-                console.log('✅ Service Worker registrado')
-            })
-            .catch(err => console.error('❌ Error registrando SW:', err))
-    }
 
     if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission();
@@ -373,7 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Date(todo.dueDate).getTime() <= new Date().getTime();
     }
 
-    // ✅ checkAlerts: usa Service Worker para Brave/Chrome
     function checkAlerts() {
         if (!todos.length) return;
         const now = new Date();
