@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitectura JECR Task Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080b14;
+    --surface: #0e1420;
+    --border: #1e2a3a;
+    --accent: #7c6af7;
+    --accent2: #38bdf8;
+    --accent3: #34d399;
+    --accent4: #fb923c;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .header .tag {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(124,106,247,0.3);
+    padding: 4px 12px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+
+  .header h1 {
+    font-family: var(--font-display);
+    font-size: clamp(24px, 4vw, 38px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header p {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 8px;
+  }
+
+  /* ===== DIAGRAM ===== */
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .diagram::before {
+    content: 'ARCHITECTURE DIAGRAM';
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    opacity: 0.5;
+  }
+
+  .diagram-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  /* Layers */
+  .layers {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .layer {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .layer-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: right;
+    padding-right: 12px;
+    border-right: 2px solid var(--border);
+  }
+
+  .layer-content {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* Nodes */
+  .node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid;
+    position: relative;
+    white-space: nowrap;
+  }
+
+  .node-icon { font-size: 16px; }
+
+  .node.purple {
+    background: rgba(124,106,247,0.1);
+    border-color: rgba(124,106,247,0.4);
+    color: #a78bfa;
+  }
+
+  .node.blue {
+    background: rgba(56,189,248,0.08);
+    border-color: rgba(56,189,248,0.35);
+    color: #7dd3fc;
+  }
+
+  .node.green {
+    background: rgba(52,211,153,0.08);
+    border-color: rgba(52,211,153,0.35);
+    color: #6ee7b7;
+  }
+
+  .node.orange {
+    background: rgba(251,146,60,0.08);
+    border-color: rgba(251,146,60,0.35);
+    color: #fdba74;
+  }
+
+  .node.gray {
+    background: rgba(100,116,139,0.1);
+    border-color: rgba(100,116,139,0.3);
+    color: #94a3b8;
+  }
+
+  /* Arrows between layers */
+  .arrow-row {
+    display: flex;
+    align-items: center;
+    padding-left: 136px;
+    gap: 8px;
+  }
+
+  .arrow-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .arrow-line .line {
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--border), var(--accent));
+    opacity: 0.6;
+  }
+
+  .arrow-line .tip {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid var(--accent);
+    opacity: 0.6;
+  }
+
+  .arrow-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* Bidirectional arrows */
+  .arrows-container {
+    padding-left: 136px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+  }
+
+  .bi-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .bi-arrow .up { font-size: 10px; color: var(--accent3); }
+  .bi-arrow .vline {
+    width: 2px;
+    height: 16px;
+    background: linear-gradient(var(--accent3), var(--accent));
+    opacity: 0.5;
+  }
+  .bi-arrow .down { font-size: 10px; color: var(--accent); }
+
+  .flow-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* ===== SECTIONS ===== */
+  .sections {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 640px) {
+    .sections { grid-template-columns: 1fr; }
+    .layer { grid-template-columns: 90px 1fr; }
+    .arrow-row { padding-left: 106px; }
+    .arrows-container { padding-left: 106px; }
+  }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+
+  .section.full {
+    grid-column: 1 / -1;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .section-icon.purple { background: rgba(124,106,247,0.15); }
+  .section-icon.blue   { background: rgba(56,189,248,0.12); }
+  .section-icon.green  { background: rgba(52,211,153,0.12); }
+  .section-icon.orange { background: rgba(251,146,60,0.12); }
+
+  .section h3 {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .section h3 span {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+    margin-top: 1px;
+  }
+
+  .section p {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #94a3b8;
+  }
+
+  /* Code-style highlight */
+  .hl {
+    color: var(--accent2);
+    font-weight: 600;
+  }
+
+  .hl-green { color: var(--accent3); font-weight: 600; }
+  .hl-orange { color: var(--accent4); font-weight: 600; }
+  .hl-purple { color: #a78bfa; font-weight: 600; }
+
+  /* Flow steps */
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.6;
+  }
+
+  .step-num {
+    min-width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(124,106,247,0.2);
+    border: 1px solid rgba(124,106,247,0.4);
+    color: #a78bfa;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+
+  /* Why Supabase pills */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .pill {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  .pill.green  { background: rgba(52,211,153,0.12); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.25); }
+  .pill.blue   { background: rgba(56,189,248,0.1);  color: #7dd3fc; border: 1px solid rgba(56,189,248,0.25); }
+  .pill.purple { background: rgba(124,106,247,0.1); color: #a78bfa; border: 1px solid rgba(124,106,247,0.25); }
+  .pill.orange { background: rgba(251,146,60,0.1);  color: #fdba74; border: 1px solid rgba(251,146,60,0.25); }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="tag">Documentación Técnica</div>
+    <h1>Arquitectura del Sistema</h1>
+    <p>JECR Task Manager — Frontend + Supabase Cloud</p>
+  </div>
+
+  <!-- DIAGRAM -->
+  <div class="diagram">
+    <div class="diagram-title">// Diagrama de Capas</div>
+    <div class="layers">
+
+      <!-- USER -->
+      <div class="layer">
+        <div class="layer-label">Usuario</div>
+        <div class="layer-content">
+          <div class="node purple"><span class="node-icon">👤</span> Navegador (Brave/Chrome)</div>
+        </div>
+      </div>
+
+      <div class="arrows-container">
+        <div class="bi-arrow">
+          <div class="up">▲</div>
+          <div class="vline"></div>
+          <div class="down">▼</div>
+        </div>
+        <div class="flow-label">HTTP / HTTPS — Interacción UI</div>
+      </div>
+
+      <!-- FRONTEND -->
+      <div class="layer">
+        <div class="layer-label">Frontend</div>
+        <div class="layer-content">
+          <div class="node purple"><span class="node-icon">📄</span> index.html</div>
+          <div class="node purple"><span class="node-icon">⚙️</span> app.js</div>
+          <div class="node purple"><span class="node-icon">🎨</span> styles.css</div>
+          <div class="node gray"><span class="node-icon">🔧</span> sw.js</div>
+        </div>
+      </div>
+
+      <div class="arrows-container">
+        <div class="bi-arrow">
+          <div class="up">▲</div>
+          <div class="vline"></div>
+          <div class="down">▼</div>
+        </div>
+        <div class="flow-label">Vercel CDN — Deploy automático desde GitHub</div>
+      </div>
+
+      <!-- HOSTING -->
+      <div class="layer">
+        <div class="layer-label">Hosting</div>
+        <div class="layer-content">
+          <div class="node blue"><span class="node-icon">▲</span> Vercel</div>
+          <div class="node gray"><span class="node-icon">🐙</span> GitHub (repositorio)</div>
+        </div>
+      </div>
+
+      <div class="arrows-container">
+        <div class="bi-arrow">
+          <div class="up">▲</div>
+          <div class="vline"></div>
+          <div class="down">▼</div>
+        </div>
+        <div class="flow-label">Supabase JS SDK — REST API / WebSocket</div>
+      </div>
+
+      <!-- SUPABASE -->
+      <div class="layer">
+        <div class="layer-label">Supabase</div>
+        <div class="layer-content">
+          <div class="node green"><span class="node-icon">🔐</span> Auth</div>
+          <div class="node green"><span class="node-icon">🗄️</span> PostgreSQL DB</div>
+          <div class="node green"><span class="node-icon">🛡️</span> Row Level Security</div>
+          <div class="node green"><span class="node-icon">📡</span> REST API</div>
+        </div>
+      </div>
+
+      <div class="arrows-container">
+        <div class="bi-arrow">
+          <div class="up">▲</div>
+          <div class="vline"></div>
+          <div class="down">▼</div>
+        </div>
+        <div class="flow-label">OAuth 2.0 — Autenticación delegada</div>
+      </div>
+
+      <!-- OAUTH -->
+      <div class="layer">
+        <div class="layer-label">OAuth</div>
+        <div class="layer-content">
+          <div class="node orange"><span class="node-icon">🔵</span> Google Cloud</div>
+          <div class="node orange"><span class="node-icon">⚫</span> GitHub OAuth</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTIONS -->
+  <div class="sections">
+
+    <!-- Sincronización en tiempo real -->
+    <div class="section full">
+      <div class="section-header">
+        <div class="section-icon blue">📡</div>
+        <h3>Sincronización en Tiempo Real
+          <span>Cómo se implementó</span>
+        </h3>
+      </div>
+      <p>La sincronización se logra a través del <span class="hl">Supabase JavaScript SDK</span>, que se comunica con la base de datos PostgreSQL mediante llamadas a la <span class="hl">REST API</span> de Supabase. Cada operación CRUD (crear, leer, actualizar, eliminar) se ejecuta de forma <span class="hl-green">asíncrona</span> sin recargar la página:</p>
+      <br>
+      <div class="flow-steps">
+        <div class="step"><div class="step-num">1</div>El usuario agrega/edita/elimina una tarea en el navegador</div>
+        <div class="step"><div class="step-num">2</div>La UI se actualiza <span class="hl-green">&nbsp;inmediatamente</span> en memoria local (optimistic update)</div>
+        <div class="step"><div class="step-num">3</div><span class="hl">app.js</span> llama a <span class="hl-purple">&nbsp;saveToSupabase() / updateInSupabase() / deleteFromSupabase()</span></div>
+        <div class="step"><div class="step-num">4</div>Supabase guarda el cambio en <span class="hl">PostgreSQL</span> en la nube</div>
+        <div class="step"><div class="step-num">5</div>Al iniciar sesión desde cualquier dispositivo, <span class="hl-green">loadFromSupabase()</span> recupera todas las tareas actualizadas</div>
+      </div>
+    </div>
+
+    <!-- Por qué Supabase -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon green">💡</div>
+        <h3>¿Por qué Supabase?
+          <span>Justificación de selección</span>
+        </h3>
+      </div>
+      <p>Supabase fue seleccionado por las siguientes razones:</p>
+      <div class="pills">
+        <div class="pill green">✓ Gratuito para proyectos pequeños</div>
+        <div class="pill blue">✓ SDK JavaScript sencillo</div>
+        <div class="pill purple">✓ Auth integrado (email + OAuth)</div>
+        <div class="pill orange">✓ Base de datos PostgreSQL real</div>
+        <div class="pill green">✓ Row Level Security (RLS)</div>
+        <div class="pill blue">✓ Sin necesidad de backend propio</div>
+        <div class="pill purple">✓ Dashboard visual para la DB</div>
+        <div class="pill orange">✓ Deploy en minutos</div>
+      </div>
+    </div>
+
+    <!-- OAuth Google y GitHub -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon orange">🔑</div>
+        <h3>Login con Google y GitHub
+          <span>Flujo OAuth 2.0</span>
+        </h3>
+      </div>
+      <p>El login social se implementó usando el protocolo <span class="hl">OAuth 2.0</span>, donde Supabase actúa como intermediario:</p>
+      <br>
+      <div class="flow-steps">
+        <div class="step"><div class="step-num">1</div>Usuario hace clic en <span class="hl-orange">&nbsp;"Google"</span> o <span class="hl-orange">&nbsp;"GitHub"</span></div>
+        <div class="step"><div class="step-num">2</div><span class="hl-purple">signInWithOAuth()</span> redirige al proveedor externo</div>
+        <div class="step"><div class="step-num">3</div>El proveedor verifica la identidad y redirige a <span class="hl">&nbsp;Supabase /auth/v1/callback</span></div>
+        <div class="step"><div class="step-num">4</div>Supabase crea/recupera el usuario y redirige a <span class="hl-green">&nbsp;la app en Vercel</span></div>
+        <div class="step"><div class="step-num">5</div><span class="hl-purple">onAuthStateChange()</span> detecta la sesión y muestra la app</div>
+      </div>
+    </div>
+
+    <!-- RLS -->
+    <div class="section full">
+      <div class="section-header">
+        <div class="section-icon purple">🛡️</div>
+        <h3>Seguridad con Row Level Security (RLS)
+          <span>Aislamiento de datos por usuario</span>
+        </h3>
+      </div>
+      <p>Supabase utiliza <span class="hl">RLS (Row Level Security)</span> de PostgreSQL para garantizar que cada usuario <span class="hl-green">solo pueda ver y modificar sus propias tareas</span>. Aunque dos usuarios compartan la misma base de datos, las políticas RLS filtran automáticamente los datos usando <span class="hl-purple">auth.uid()</span> — el ID único del usuario autenticado. Esto significa que incluso si alguien obtuviera la <span class="hl-orange">anon key</span> pública, no podría acceder a los datos de otro usuario.</p>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    JECR TASK MANAGER &nbsp;·&nbsp; ARQUITECTURA v1.0 &nbsp;·&nbsp; FRONTEND + SUPABASE
+  </div>
+
+</div>
+</body>
+</html>
